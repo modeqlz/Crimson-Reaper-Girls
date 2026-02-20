@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BlastSend</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  *{scrollbar-width:none}*::-webkit-scrollbar{display:none}
+  :root{--bg:#0c0c0c;--surface:#141414;--surface2:#1c1c1c;--border:#242424;--border2:#2e2e2e;--fg:#f0f0f0;--mid:#555;--mid2:#777;--white:#ffffff}
+  body{background:var(--bg);color:var(--fg);font-family:'Syne',sans-serif;font-size:14px;min-height:100vh}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.018) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+
+  .auth-screen{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:24px;padding:32px}
+  .auth-screen.hidden{display:none}
+  .auth-logo{font-size:28px;font-weight:800;letter-spacing:-1.5px;color:var(--white)}
+  .auth-logo em{color:var(--mid2);font-style:normal;font-weight:400}
+  .auth-box{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:16px}
+  .auth-title{font-size:15px;font-weight:700;text-align:center}
+  .auth-sub{font-size:12px;color:var(--mid2);text-align:center;line-height:1.7}
+  .auth-input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:13px 16px;font-family:'Syne',sans-serif;font-size:18px;color:var(--fg);outline:none;text-align:center;letter-spacing:6px}
+  .auth-input::placeholder{letter-spacing:0;color:var(--mid);font-size:13px}
+  .auth-input:focus{border-color:var(--white)}
+  .auth-btn{width:100%;background:var(--white);border:none;border-radius:12px;padding:14px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#0c0c0c;cursor:pointer}
+  .auth-btn:disabled{opacity:0.4;cursor:not-allowed}
+  .auth-spinner{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--mid2);font-size:12px}
+  .spinner{width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);border-top-color:var(--white);animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .header{position:sticky;top:0;z-index:100;background:rgba(12,12,12,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:stretch;justify-content:space-between;height:56px}
+  .logo{display:flex;align-items:center;font-size:17px;font-weight:800;letter-spacing:-1px;color:var(--white)}
+  .logo em{color:var(--mid2);font-style:normal;font-weight:400}
+  .tabs{display:flex;align-items:stretch}
+  .tab{display:flex;align-items:center;padding:0 16px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--mid2);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+  .tab.active{color:var(--white);border-bottom-color:var(--white)}
+
+  .page{display:none;padding:24px 20px 40px;flex-direction:column;gap:24px;position:relative;z-index:1}
+  .page.active{display:flex}
+  .lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--mid);text-transform:uppercase;margin-bottom:10px}
+
+  .rec-wrap{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface)}
+  .tags-zone{display:flex;flex-wrap:wrap;gap:7px;padding:14px;min-height:58px;align-content:flex-start}
+  .tag{display:flex;align-items:center;gap:7px;background:var(--white);color:#0c0c0c;border-radius:100px;padding:6px 11px 6px 7px;font-size:12px;font-weight:600;animation:tagPop .25s cubic-bezier(.34,1.56,.64,1)}
+  @keyframes tagPop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+  .tag-av{width:20px;height:20px;border-radius:50%;background:#0c0c0c;color:var(--white);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0}
+  .tag-x{cursor:pointer;opacity:.35;font-size:14px;line-height:1}
+  .add-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-top:1px solid var(--border);cursor:pointer;transition:background .15s;font-size:12px;font-weight:500;color:var(--mid2)}
+  .add-row:hover{background:var(--surface2);color:var(--fg)}
+  .add-circle{width:26px;height:26px;border-radius:50%;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--mid2);line-height:1}
+
+  .comp-wrap{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface)}
+  .textarea{width:100%;min-height:130px;background:transparent;border:none;outline:none;resize:none;font-family:'Syne',sans-serif;font-size:14px;line-height:1.7;color:var(--fg);padding:16px}
+  .textarea::placeholder{color:var(--mid)}
+  .comp-bar{display:flex;align-items:center;gap:6px;padding:9px 12px;border-top:1px solid var(--border)}
+  .fmt{width:28px;height:28px;border-radius:7px;border:1px solid var(--border2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--mid2);transition:all .15s;font-family:inherit}
+  .fmt:hover{border-color:var(--white);color:var(--white)}
+  .char-c{margin-left:auto;font-family:'DM Mono',monospace;font-size:10px;color:var(--mid)}
+
+  .att-row{display:flex;gap:8px;overflow-x:auto}
+  .att-thumb{flex-shrink:0;width:68px;height:68px;border-radius:12px;border:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:24px;position:relative;overflow:hidden}
+  .att-thumb img{width:100%;height:100%;object-fit:cover}
+  .att-del{position:absolute;top:4px;right:4px;width:17px;height:17px;border-radius:50%;background:var(--white);color:#0c0c0c;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:700}
+  .att-add{flex-shrink:0;width:68px;height:68px;border-radius:12px;border:1px dashed var(--border2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;transition:all .15s;color:var(--mid)}
+  .att-add:hover{border-color:var(--white);color:var(--white)}
+  .att-add span{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
+
+  .sched-row{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
+  .sched-left{display:flex;flex-direction:column;gap:2px}
+  .sched-t{font-size:13px;font-weight:600}
+  .sched-s{font-size:11px;color:var(--mid2)}
+  .toggle{width:44px;height:25px;border-radius:12px;background:var(--border2);position:relative;cursor:pointer;transition:background .25s;flex-shrink:0}
+  .toggle.on{background:var(--white)}
+  .toggle::after{content:'';position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:var(--bg);transition:left .25s}
+  .toggle.on::after{left:22px}
+  .sched-input{display:none;border:1px solid var(--white);border-top:none;border-radius:0 0 14px 14px;background:var(--surface);padding:12px 16px;font-family:'Syne',sans-serif;font-size:13px;color:var(--fg);outline:none;margin-top:-14px;color-scheme:dark}
+  .sched-input.show{display:block}
+
+  .send-btn{width:100%;background:var(--white);border:none;border-radius:14px;padding:16px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:#0c0c0c;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:transform .12s,opacity .12s;letter-spacing:-0.3px;position:relative;overflow:hidden}
+  .send-btn:active{transform:scale(.98);opacity:.9}
+  .send-btn:disabled{opacity:.5;cursor:not-allowed}
+  .send-right{display:flex;align-items:center;gap:8px}
+  .send-pill{background:rgba(0,0,0,.12);border-radius:8px;padding:3px 10px;font-size:11px;font-family:'DM Mono',monospace}
+  .send-arrow{font-size:18px}
+  .btn-loader{position:absolute;inset:0;background:var(--white);display:flex;align-items:center;justify-content:center;gap:6px;opacity:0;pointer-events:none;transition:opacity .2s}
+  .btn-loader.show{opacity:1}
+  .dot-loader span{display:inline-block;width:6px;height:6px;border-radius:50%;background:#0c0c0c;animation:dotB 1.2s infinite}
+  .dot-loader span:nth-child(2){animation-delay:.2s}.dot-loader span:nth-child(3){animation-delay:.4s}
+  @keyframes dotB{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-8px)}}
+
+  .overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);display:none;align-items:flex-end}
+  .overlay.open{display:flex}
+  .sheet{width:100%;max-height:85vh;background:var(--surface);border-radius:20px 20px 0 0;border:1px solid var(--border);border-bottom:none;display:flex;flex-direction:column;animation:sheetUp .3s cubic-bezier(.32,1.1,.32,1);padding-bottom:20px}
+  @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .handle{width:32px;height:3px;border-radius:2px;background:var(--border2);margin:14px auto 0}
+  .sheet-hd{padding:14px 20px 0;display:flex;align-items:center;justify-content:space-between}
+  .sheet-title{font-size:14px;font-weight:700}
+  .sheet-x{width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--mid2)}
+  .filter-tabs{display:flex;gap:6px;padding:12px 20px;border-bottom:1px solid var(--border)}
+  .ftab{padding:6px 14px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border2);color:var(--mid2);transition:all .2s}
+  .ftab.active{background:var(--white);color:#0c0c0c;border-color:var(--white)}
+  .srch-wrap{padding:10px 20px;border-bottom:1px solid var(--border)}
+  .srch-field{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 14px;font-family:'Syne',sans-serif;font-size:13px;color:var(--fg);outline:none}
+  .srch-field::placeholder{color:var(--mid)}
+  .clist{flex:1;overflow-y:auto;padding:8px 12px}
+  .loading-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;gap:12px;color:var(--mid2);font-size:12px}
+  .empty-state{text-align:center;padding:40px 20px;color:var(--mid2);font-size:13px;line-height:1.6}
+  .citem{display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;cursor:pointer;transition:background .12s}
+  .citem:hover{background:var(--surface2)}
+  .citem.sel{background:rgba(255,255,255,.06)}
+  .cav{width:40px;height:40px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);color:var(--fg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;transition:all .15s}
+  .citem.sel .cav{background:var(--white);color:#0c0c0c;border-color:var(--white)}
+  .cinfo{flex:1;min-width:0}
+  .cname{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .csub{font-size:11px;color:var(--mid2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .csource{font-size:9px;font-family:'DM Mono',monospace;letter-spacing:.5px;padding:2px 6px;border-radius:4px;border:1px solid var(--border2);color:var(--mid);margin-top:3px;display:inline-block}
+  .ccheck{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+  .citem.sel .ccheck{background:var(--white);border-color:var(--white)}
+  .citem.sel .ccheck::after{content:'✓';font-size:10px;color:#0c0c0c}
+  .sheet-confirm{margin:10px 20px 0;background:var(--white);border:none;border-radius:12px;padding:14px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#0c0c0c;cursor:pointer}
+
+  .hcard{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .hcard-top{display:flex;align-items:center;justify-content:space-between}
+  .havs{display:flex}
+  .hav{width:28px;height:28px;border-radius:50%;background:var(--surface2);border:2px solid var(--surface);color:var(--fg);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;margin-left:-8px}
+  .hav:first-child{margin-left:0}
+  .hbadge{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;padding:4px 9px;border-radius:6px}
+  .b-sent{background:var(--white);color:#0c0c0c}
+  .b-err{border:1px solid #3a1a1a;color:#884444}
+  .hmsg{font-size:12px;color:var(--mid2);line-height:1.6}
+  .hfoot{display:flex;justify-content:space-between}
+  .hmeta{font-family:'DM Mono',monospace;font-size:10px;color:var(--mid)}
+  .hstat{font-size:11px;font-weight:600;color:var(--fg)}
+
+  .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(14px);padding:11px 22px;border-radius:100px;font-size:11px;font-weight:700;font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:300;pointer-events:none;white-space:nowrap}
+  .toast.success{background:var(--white);color:#0c0c0c}
+  .toast.error{background:#ff4444;color:#fff}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- Экран авторизации -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-logo">blast<em>/send</em></div>
+  <div class="auth-box" id="authBox">
+    <div class="auth-title" id="authTitle">Подключение...</div>
+    <div class="auth-sub" id="authSub">Проверяем соединение с Telegram</div>
+    <div class="auth-spinner" id="authSpinner"><div class="spinner"></div><span>Секунду...</span></div>
+  </div>
+</div>
+
+<!-- Основное приложение -->
+<div class="header">
+  <div class="logo">blast<em>/send</em></div>
+  <div class="tabs">
+    <div class="tab active" onclick="gotoTab('compose')">Рассылка</div>
+    <div class="tab" onclick="gotoTab('history')">История</div>
+  </div>
+</div>
+
+<div class="page active" id="tab-compose">
+  <div>
+    <div class="lbl">Получатели</div>
+    <div class="rec-wrap">
+      <div class="tags-zone" id="tags">
+        <div class="empty-hint" style="color:var(--mid);font-size:12px;padding:4px 2px">Добавь получателей →</div>
+      </div>
+      <div class="add-row" onclick="openModal()">
+        <div class="add-circle">+</div>
+        Выбрать из контактов и диалогов
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="lbl">Сообщение</div>
+    <div class="comp-wrap">
+      <textarea class="textarea" id="msgArea" placeholder="Напишите сообщение..." oninput="countC()"></textarea>
+      <div class="comp-bar">
+        <button class="fmt" onclick="wrapText('**')" style="font-weight:700">B</button>
+        <button class="fmt" onclick="wrapText('__')" style="font-style:italic;font-family:Georgia,serif">I</button>
+        <button class="fmt" onclick="wrapText('`')">&lt;&gt;</button>
+        <span class="char-c" id="charEl">0 / 4096</span>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="lbl">Вложения</div>
+    <div class="att-row" id="attRow">
+      <div class="att-add" onclick="document.getElementById('fileInput').click()">
+        <span style="font-size:22px;line-height:1">+</span>
+        <span>Файл</span>
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*,video/*,.pdf,.doc,.docx" multiple style="display:none" onchange="handleFiles(this.files)">
+  </div>
+  <div>
+    <div class="lbl">Время отправки</div>
+    <div class="sched-row" onclick="toggleSched()">
+      <div class="sched-left">
+        <div class="sched-t">Запланировать</div>
+        <div class="sched-s">Выбрать дату и время</div>
+      </div>
+      <div class="toggle" id="togEl"></div>
+    </div>
+    <input type="datetime-local" class="sched-input" id="schedIn">
+  </div>
+  <button class="send-btn" id="sendBtn" onclick="doSend()">
+    <span>Отправить рассылку</span>
+    <div class="send-right">
+      <span class="send-pill" id="cntEl">0 чел.</span>
+      <span class="send-arrow">↗</span>
+    </div>
+    <div class="btn-loader" id="btnLoader">
+      <div class="dot-loader"><span></span><span></span><span></span></div>
+    </div>
+  </button>
+</div>
+
+<div class="page" id="tab-history">
+  <div class="lbl">Последние рассылки</div>
+  <div id="histList" style="display:flex;flex-direction:column;gap:10px">
+    <div style="color:var(--mid2);font-size:13px;text-align:center;padding:40px 0">История появится после первой рассылки</div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="sheet-hd">
+      <span class="sheet-title">Получатели</span>
+      <button class="sheet-x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="filter-tabs">
+      <div class="ftab active" onclick="setFilter('all',this)">Все</div>
+      <div class="ftab" onclick="setFilter('dialog',this)">Диалоги</div>
+      <div class="ftab" onclick="setFilter('contact',this)">Контакты</div>
+    </div>
+    <div class="srch-wrap">
+      <input class="srch-field" id="srchField" placeholder="Поиск по имени..." oninput="renderContacts()">
+    </div>
+    <div class="clist" id="clist"></div>
+    <button class="sheet-confirm" onclick="confirmSel()">Добавить выбранных</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '/api';
+const tg = window.Telegram?.WebApp;
+if(tg){tg.ready();tg.expand();tg.setHeaderColor('#0c0c0c');tg.setBackgroundColor('#0c0c0c')}
+
+let allUsers=[], chosen=new Set(), addedUsers=new Map(), attachedFiles=[], sendHistory=[], currentFilter='all';
+
+// ── Проверка подключения ──
+async function checkConnection(){
+  try{
+    const r=await fetch(`${API}/status`);
+    const d=await r.json();
+    if(d.connected){
+      document.getElementById('authScreen').classList.add('hidden');
+      await loadAllUsers();
+    } else {
+      showAuthStatus('Ожидание авторизации','Сервер запущен. Проверьте логи — возможно нужно ввести код из Telegram.');
+      setTimeout(checkConnection,3000);
+    }
+  } catch(e){
+    showAuthStatus('Подключение...','Ожидаем запуска сервера...');
+    setTimeout(checkConnection,3000);
+  }
+}
+
+function showAuthStatus(title,sub){
+  document.getElementById('authTitle').textContent=title;
+  document.getElementById('authSub').textContent=sub;
+}
+
+// ── Загрузка контактов и диалогов ──
+async function loadAllUsers(){
+  try{
+    const [cr,dr]=await Promise.all([fetch(`${API}/contacts`),fetch(`${API}/dialogs`)]);
+    const cd=await cr.json(), dd=await dr.json();
+    const map=new Map();
+    if(dd.ok) dd.users.forEach(u=>map.set(u.id,u));
+    if(cd.ok) cd.users.forEach(u=>{
+      if(!map.has(u.id)) map.set(u.id,u);
+      else map.get(u.id).source='both';
+    });
+    allUsers=[...map.values()];
+  } catch(e){ console.error(e); }
+}
+
+function renderContacts(){
+  const el=document.getElementById('clist');
+  const q=document.getElementById('srchField').value.toLowerCase();
+  const filtered=allUsers.filter(u=>{
+    const mq=u.name.toLowerCase().includes(q)||(u.username&&u.username.toLowerCase().includes(q));
+    const mf=currentFilter==='all'||u.source===currentFilter||u.source==='both';
+    return mq&&mf;
+  });
+  if(!filtered.length){el.innerHTML='<div class="empty-state">😕 Никого не найдено</div>';return;}
+  el.innerHTML=filtered.map(u=>{
+    const sel=chosen.has(u.id)||addedUsers.has(u.id);
+    const sub=u.lastMessage||(u.username?`@${u.username}`:'');
+    const src=u.source==='dialog'?'ДИАЛОГ':u.source==='both'?'КОНТАКТ+ДИАЛОГ':'КОНТАКТ';
+    return `<div class="citem${sel?' sel':''}" onclick="toggleC('${u.id}')">
+      <div class="cav">${u.initials}</div>
+      <div class="cinfo">
+        <div class="cname">${u.name}</div>
+        ${sub?`<div class="csub">${sub}</div>`:''}
+        <div class="csource">${src}</div>
+      </div>
+      <div class="ccheck"></div>
+    </div>`;
+  }).join('');
+}
+
+function setFilter(f,el){
+  currentFilter=f;
+  document.querySelectorAll('.ftab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderContacts();
+}
+
+function toggleC(id){
+  if(addedUsers.has(id))return;
+  chosen.has(id)?chosen.delete(id):chosen.add(id);
+  renderContacts();
+}
+
+async function openModal(){
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('clist').innerHTML='<div class="loading-state"><div class="spinner"></div><span>Загружаем...</span></div>';
+  await loadAllUsers();
+  renderContacts();
+}
+function closeModal(){document.getElementById('overlay').classList.remove('open');chosen.clear();}
+
+function confirmSel(){
+  const zone=document.getElementById('tags');
+  const hint=zone.querySelector('.empty-hint');
+  if(hint)hint.remove();
+  chosen.forEach(id=>{
+    if(addedUsers.has(id))return;
+    const u=allUsers.find(x=>x.id===id);
+    if(!u)return;
+    addedUsers.set(id,u);
+    const sn=u.name.split(' ')[0]+(u.name.split(' ')[1]?' '+u.name.split(' ')[1][0]+'.':'');
+    const t=document.createElement('div');
+    t.className='tag';t.dataset.uid=id;
+    t.innerHTML=`<div class="tag-av">${u.initials}</div>${sn}<div class="tag-x" onclick="removeTag(this)">×</div>`;
+    zone.appendChild(t);
+  });
+  chosen.clear();updateCount();closeModal();
+}
+
+function removeTag(el){
+  const t=el.closest('.tag');
+  addedUsers.delete(t.dataset.uid);t.remove();
+  const z=document.getElementById('tags');
+  if(!z.querySelector('.tag')) z.innerHTML='<div class="empty-hint" style="color:var(--mid);font-size:12px;padding:4px 2px">Добавь получателей →</div>';
+  updateCount();
+}
+function updateCount(){document.getElementById('cntEl').textContent=addedUsers.size+' чел.';}
+function countC(){document.getElementById('charEl').textContent=document.getElementById('msgArea').value.length+' / 4096';}
+function wrapText(c){const ta=document.getElementById('msgArea'),s=ta.selectionStart,e=ta.selectionEnd,sel=ta.value.substring(s,e);if(sel){ta.value=ta.value.substring(0,s)+c+sel+c+ta.value.substring(e);}ta.focus();countC();}
+
+function handleFiles(files){
+  const row=document.getElementById('attRow'),add=row.querySelector('.att-add');
+  Array.from(files).forEach(f=>{
+    attachedFiles.push(f);
+    const t=document.createElement('div');t.className='att-thumb';t.dataset.idx=attachedFiles.length-1;
+    if(f.type.startsWith('image/')) t.innerHTML=`<img src="${URL.createObjectURL(f)}"><div class="att-del" onclick="this.parentElement.remove()">✕</div>`;
+    else t.innerHTML=`📄<div class="att-del" onclick="this.parentElement.remove()">✕</div>`;
+    row.insertBefore(t,add);
+  });
+  document.getElementById('fileInput').value='';
+}
+
+let schedOn=false;
+function toggleSched(){schedOn=!schedOn;document.getElementById('togEl').classList.toggle('on',schedOn);document.getElementById('schedIn').classList.toggle('show',schedOn);}
+
+async function doSend(){
+  const text=document.getElementById('msgArea').value.trim();
+  const ids=[...addedUsers.keys()];
+  const files=attachedFiles.filter(Boolean);
+  if(!ids.length){showToast('Выбери получателей!','error');return;}
+  if(!text&&!files.length){showToast('Напиши сообщение','error');return;}
+  const btn=document.getElementById('sendBtn'),loader=document.getElementById('btnLoader');
+  btn.disabled=true;loader.classList.add('show');
+  try{
+    const fd=new FormData();
+    fd.append('text',text);fd.append('recipients',JSON.stringify(ids));
+    files.forEach(f=>fd.append('files',f));
+    const r=await fetch(`${API}/blast`,{method:'POST',body:fd});
+    const d=await r.json();
+    if(d.ok){
+      addToHistory(text,[...addedUsers.values()],d.sent,d.failed);
+      showToast(`✓ Отправлено ${d.sent} из ${ids.length}`,'success');
+      document.getElementById('msgArea').value='';
+      document.getElementById('charEl').textContent='0 / 4096';
+      document.getElementById('tags').innerHTML='<div class="empty-hint" style="color:var(--mid);font-size:12px;padding:4px 2px">Добавь получателей →</div>';
+      document.getElementById('attRow').innerHTML='<div class="att-add" onclick="document.getElementById(\'fileInput\').click()"><span style="font-size:22px;line-height:1">+</span><span>Файл</span></div>';
+      addedUsers.clear();attachedFiles=[];updateCount();
+    } else showToast(d.error||'Ошибка','error');
+  } catch(e){showToast('Нет связи с сервером','error');}
+  finally{btn.disabled=false;loader.classList.remove('show');}
+}
+
+function addToHistory(text,users,sent,failed){
+  sendHistory.unshift({text,users,sent,failed,date:new Date()});
+  renderHistory();
+}
+function renderHistory(){
+  const l=document.getElementById('histList');
+  if(!sendHistory.length)return;
+  l.innerHTML=sendHistory.map(e=>{
+    const avs=e.users.slice(0,3).map(u=>`<div class="hav">${u.initials}</div>`).join('')+(e.users.length>3?`<div class="hav">+${e.users.length-3}</div>`:'');
+    const badge=e.failed===0?'<div class="hbadge b-sent">ОТПРАВЛЕНО</div>':'<div class="hbadge b-err">ЧАСТИЧНО</div>';
+    const t=e.date.toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'});
+    return `<div class="hcard"><div class="hcard-top"><div class="havs">${avs}</div>${badge}</div><div class="hmsg">${e.text?e.text.slice(0,80):'📎 Файл'}</div><div class="hfoot"><div class="hmeta">${t} · ${e.users.length} чел.</div><div class="hstat">${e.sent}/${e.users.length} доставлено</div></div></div>`;
+  }).join('');
+}
+
+function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type}`;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+function gotoTab(id){document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['compose','history'][i]===id));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('tab-'+id).classList.add('active');if(id==='history')renderHistory();}
+document.getElementById('overlay').addEventListener('click',e=>{if(e.target===document.getElementById('overlay'))closeModal();});
+
+checkConnection();
+</script>
+</body>
+</html>
