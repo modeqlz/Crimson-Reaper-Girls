@@ -80,7 +80,8 @@ app.get('/', (req, res) => {
 
 // ── API: статус подключения ──
 app.get('/api/status', (req, res) => {
-  res.json({ ok: true, connected: isConnected });
+  const waitingFor = resolveCode ? 'code' : resolvePassword ? 'password' : null;
+  res.json({ ok: true, connected: isConnected, waitingFor });
 });
 
 // ── API: ввод кода из Telegram ──

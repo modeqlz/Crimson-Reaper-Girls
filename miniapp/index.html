@@ -26,6 +26,7 @@
   .auth-btn{width:100%;background:var(--white);border:none;border-radius:12px;padding:14px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#0c0c0c;cursor:pointer}
   .auth-btn:disabled{opacity:0.4;cursor:not-allowed}
   .auth-spinner{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--mid2);font-size:12px}
+  .auth-form{display:flex;flex-direction:column;gap:16px;width:100%}
   .spinner{width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);border-top-color:var(--white);animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -144,10 +145,32 @@
 <!-- Экран авторизации -->
 <div class="auth-screen" id="authScreen">
   <div class="auth-logo">blast<em>/send</em></div>
-  <div class="auth-box" id="authBox">
+
+  <!-- Состояние: ожидание / загрузка -->
+  <div class="auth-box" id="authBox" style="display:flex">
     <div class="auth-title" id="authTitle">Подключение...</div>
     <div class="auth-sub" id="authSub">Проверяем соединение с Telegram</div>
     <div class="auth-spinner" id="authSpinner"><div class="spinner"></div><span>Секунду...</span></div>
+  </div>
+
+  <!-- Состояние: нужен код из Telegram -->
+  <div class="auth-box" id="codeBox" style="display:none">
+    <div class="auth-title">Код из Telegram</div>
+    <div class="auth-sub">Telegram отправил тебе код подтверждения. Введи его ниже.</div>
+    <div class="auth-form">
+      <input class="auth-input" id="codeInput" type="tel" inputmode="numeric" maxlength="7" placeholder="Введи код">
+      <button class="auth-btn" id="codeBtn" onclick="submitCode()">Подтвердить</button>
+    </div>
+  </div>
+
+  <!-- Состояние: нужен пароль 2FA -->
+  <div class="auth-box" id="passBox" style="display:none">
+    <div class="auth-title">Пароль 2FA</div>
+    <div class="auth-sub">Введи облачный пароль Telegram (двухфакторная аутентификация).</div>
+    <div class="auth-form">
+      <input class="auth-input" id="passInput" type="password" placeholder="Пароль" style="letter-spacing:2px">
+      <button class="auth-btn" id="passBtn" onclick="submitPass()">Войти</button>
+    </div>
   </div>
 </div>
 
@@ -262,19 +285,76 @@ async function checkConnection(){
     if(d.connected){
       document.getElementById('authScreen').classList.add('hidden');
       await loadAllUsers();
-    } else {
-      showAuthStatus('Ожидание авторизации','Сервер запущен. Проверьте логи — возможно нужно ввести код из Telegram.');
-      setTimeout(checkConnection,3000);
+      return;
     }
+    // Проверяем что ожидает сервер
+    if(d.waitingFor==='code'){
+      showBox('codeBox');
+    } else if(d.waitingFor==='password'){
+      showBox('passBox');
+    } else {
+      showBox('authBox');
+      showAuthStatus('Ожидание авторизации','Сервер запущен. Telegram отправит код — страница обновится автоматически.');
+    }
+    setTimeout(checkConnection,3000);
   } catch(e){
+    showBox('authBox');
     showAuthStatus('Подключение...','Ожидаем запуска сервера...');
     setTimeout(checkConnection,3000);
   }
 }
 
+function showBox(id){
+  ['authBox','codeBox','passBox'].forEach(b=>{
+    document.getElementById(b).style.display=b===id?'flex':'none';
+  });
+  // authBox uses flex-direction column inside auth-box
+  if(id==='authBox') document.getElementById('authBox').style.flexDirection='column';
+}
+
 function showAuthStatus(title,sub){
   document.getElementById('authTitle').textContent=title;
   document.getElementById('authSub').textContent=sub;
+}
+
+async function submitCode(){
+  const code=document.getElementById('codeInput').value.trim();
+  if(!code){document.getElementById('codeInput').focus();return;}
+  const btn=document.getElementById('codeBtn');
+  btn.disabled=true;btn.textContent='Отправляем...';
+  try{
+    const r=await fetch(`${API}/auth/code`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+    const d=await r.json();
+    if(d.ok){
+      showBox('authBox');
+      showAuthStatus('Проверяем код...','Ждём ответа от Telegram');
+      document.getElementById('codeInput').value='';
+      setTimeout(checkConnection,1500);
+    } else {
+      showToast(d.error||'Неверный код','error');
+    }
+  } catch(e){showToast('Ошибка связи','error');}
+  finally{btn.disabled=false;btn.textContent='Подтвердить';}
+}
+
+async function submitPass(){
+  const password=document.getElementById('passInput').value;
+  if(!password){document.getElementById('passInput').focus();return;}
+  const btn=document.getElementById('passBtn');
+  btn.disabled=true;btn.textContent='Входим...';
+  try{
+    const r=await fetch(`${API}/auth/password`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});
+    const d=await r.json();
+    if(d.ok){
+      showBox('authBox');
+      showAuthStatus('Проверяем пароль...','Ждём ответа от Telegram');
+      document.getElementById('passInput').value='';
+      setTimeout(checkConnection,1500);
+    } else {
+      showToast(d.error||'Неверный пароль','error');
+    }
+  } catch(e){showToast('Ошибка связи','error');}
+  finally{btn.disabled=false;btn.textContent='Войти';}
 }
 
 // ── Загрузка контактов и диалогов ──
